@@ -1,0 +1,33 @@
+---
+- name: Obtain Let's Encrypt SSL Certificates
+  hosts: localhost
+  gather_facts: false
+  vars:
+    domain: "wordpress-rna.senecops.com"
+    acme_account_email: "admin@example.com"
+    acme_account_key: "/path/to/account.key"  # Path to the account private key
+    acme_directory: "https://acme-v02.api.letsencrypt.org/directory"  # Let's Encrypt ACMEv2 directory
+    acme_challenge_dir: "/var/www/html/.well-known/acme-challenge"  # Directory for HTTP challenges
+    ssl_certificate_dest: "/etc/nginx/ssl/{{ domain }}.crt"  # Destination for SSL certificate
+    ssl_private_key_dest: "/etc/nginx/ssl/{{ domain }}.key"   # Destination for SSL private key
+
+  tasks:
+    - name: Generate Let's Encrypt SSL Certificate
+      community.general.acme_certificate:
+        account_email: "{{ acme_account_email }}"
+        account_key: "{{ acme_account_key }}"
+        acme_directory: "{{ acme_directory }}"
+        domains:
+          - "{{ domain }}"
+        challenge: http-01
+        challenge_dir: "{{ acme_challenge_dir }}"
+        dest: "{{ ssl_certificate_dest }}"
+        privatekey_dest: "{{ ssl_private_key_dest }}"
+        state: present
+      register: acme_certificate_result
+
+    - name: Reload Nginx if certificate was obtained
+      service:
+        name: nginx
+        state: reloaded
+      when: acme_certificate_result.changed

@@ -1,0 +1,45 @@
+# roles/lb/tasks/main.yml
+
+- name: Install HAProxy
+  apt:
+    name: haproxy
+    state: present
+
+- name: Configure HAProxy
+  template:
+    src: haproxy.cfg.j2
+    dest: /etc/haproxy/haproxy.cfg
+  notify:
+    - restart haproxy
+
+- name: Enable HAProxy service
+  systemd:
+    name: haproxy
+    enabled: yes
+    state: started
+
+handlers:
+  - name: restart haproxy
+    service:
+      name: haproxy
+      state: restarted
+
+# roles/lb/tasks/main.yml
+
+- name: Generate private key and CSR
+  command: >
+    openssl req
+    -new
+    -newkey rsa:2048
+    -nodes
+    -keyout /etc/ssl/private/domain.key
+    -out /etc/ssl/certs/domain.csr
+    -subj "/C=US/ST=State/L=City/O=Organization/OU=Organizational Unit/CN=example.com"
+
+- name: Obtain Let's Encrypt certificate
+  command: >
+    openssl req
+    -new
+    -sha256
+    -key /etc/ssl/private/domain.key
+    -subj "/C=US/ST=State/L=City/O=

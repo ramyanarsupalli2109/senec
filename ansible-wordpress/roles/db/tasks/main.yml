@@ -1,0 +1,56 @@
+---
+- name: Deploy WordPress Cluster
+  hosts: localhost
+  gather_facts: false
+  vars:
+    servers:
+      web1:
+        internal_ip: 10.0.0.1
+        external_ip: 49.13.43.123
+      web2:
+        internal_ip: 10.0.0.2
+      web3:
+        internal_ip: 10.0.0.3
+      lb:
+        internal_ip: 10.0.0.4
+        external_ip: 49.13.43.123
+    ssh_key: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQC/7WVNHJg2ivaf5fah3WLlofZv7AS05472qgC5xirykVOs0ga3pQPLChiePpbYuztAVTc3J9"
+
+  tasks:
+    - name: Install required packages for Let's Encrypt
+      package:
+        name: "{{ item }}"
+        state: present
+      with_items:
+        - certbot
+        - python3-certbot-nginx  # For Nginx integration
+
+    - name: Obtain Let's Encrypt SSL certificate
+      command: "certbot --nginx --agree-tos --redirect --non-interactive --email admin@example.com -d wordpress-rna.senecops.com"
+      become: true
+
+    - name: Deploy WordPress cluster servers
+      include_role:
+        name: wordpress_server
+      vars:
+        servers: "{{ servers }}"
+        ssh_key: "{{ ssh_key }}"
+
+    - name: Update Nginx configuration for SSL termination
+      copy:
+        src: nginx_ssl_termination.conf
+        dest: /etc/nginx/sites-available/wordpress_ssl_termination.conf
+      notify: Reload Nginx
+
+    - name: Enable Nginx configuration for SSL termination
+      file:
+        src: /etc/nginx/sites-available/wordpress_ssl_termination.conf
+        dest: /etc/nginx/sites-enabled/wordpress_ssl_termination.conf
+        state: link
+      notify: Reload Nginx
+
+  handlers:
+    - name: Reload Nginx
+      service:
+        name: nginx
+        state: reloaded
